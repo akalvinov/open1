@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-port: '3001'
+    alb.ingress.kubernetes.io/healthcheck-path: /health/liveness
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '3'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/target-type: ip
+    # Sticky sessions. Uncomment if required
+    # alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=600
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: api-port
+      protocol: TCP
+      name: http
+    - port: 3001
+      targetPort: openmetrics
+      protocol: TCP
+      name: http-health
+  selector:
+    {{- include "app.labels" . | nindent 4 }}

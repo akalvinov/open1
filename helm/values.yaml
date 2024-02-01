@@ -1,0 +1,25 @@
+appName: custom-api
+
+replicaCount: 1
+
+domainName: dev.custom.com
+
+resources:
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  limits:
+    memory: 2200Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+app:
+  aws_region: eu-central-1
+  trace_enabled: "false"
+  kafka_port: "9092"
+  publications:
+    somebox:
+      image_enabled: "true"
+      video_enabled: "true"

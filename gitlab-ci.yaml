@@ -1,0 +1,56 @@
+stages:
+  - deploy
+
+
+variables:
+  IMG_NAME: custom-api
+  CLUSTER_NAME: "development"
+  CUSTOM_BRANCH_DEPLOY: "do-not-change." #Workaround to prevent accidental branch deploy
+
+
+.helm_deploy:
+  stage: deploy
+  script:
+    - cd ${HELM_CD}
+    - helm upgrade --wait --timeout 600s --install -n ${ENVIRONMENT} -f ./helm/values-${ENVIRONMENT}.yaml --set imageTag=${IMAGE_TAG} ${RELEASE_NAME} ./helm 
+
+.kubernetes_auth:
+  tags:
+    - docker
+  image: registry.gitlab.com/customuse/devops/deployer:0.0.12
+  before_script:
+    - eval $(aws sts assume-role --role-arn arn:aws:iam::000064010000:role/${CLUSTER_NAME}-kubectl-access-role --role-session-name test | jq -r '.Credentials | "export AWS_ACCESS_KEY_ID=\(.AccessKeyId)\nexport AWS_SECRET_ACCESS_KEY=\(.SecretAccessKey)\nexport AWS_SESSION_TOKEN=\(.SessionToken)\n"')
+    - aws eks update-kubeconfig --name ${CLUSTER_NAME} 
+
+
+
+helm_deploy:
+  variables:
+    RELEASE_NAME: "api"
+  extends:
+    - .kubernetes_auth
+    - .helm_deploy
+  environment:
+    name: $CI_COMMIT_REF_SLUG
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+-rc\d+$/'  #rc
+      when: on_success
+      variables:
+        ENVIRONMENT: "rc"
+        IMAGE_TAG: $CI_COMMIT_TAG
+    - if: '$CI_COMMIT_BRANCH == "develop"'  #develop
+      when: on_success
+      variables:
+        ENVIRONMENT: "development"
+        IMAGE_TAG: "develop"
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'  #prod
+      when: on_success
+      variables:
+        ENVIRONMENT: "production"
+        IMAGE_TAG: $CI_COMMIT_TAG
+        CLUSTER_NAME: "production"
+    - if: '$CUSTOM_BRANCH_DEPLOY == $CI_COMMIT_BRANCH'  #Custom branch deploy. 
+      when: on_success
+      variables:
+        ENVIRONMENT: "development"
+        IMAGE_TAG: $CUSTOM_BRANCH_DEPLOY

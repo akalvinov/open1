@@ -1,0 +1,21 @@
+namespace: "production"
+
+domainName: custom.com
+
+replicaCount: 5
+
+resources: 
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  requests:
+    cpu: 1000m
+    memory: 2200Mi
+
+app:
+  url: "https://custom.com/"
+  env: prod
+  throttling_limit: 20
+  login_token_expiration_time: "600"
+  jwt_ignore_token_expiration: "false"
+  

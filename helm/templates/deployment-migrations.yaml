@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-migration
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "app.migration-labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 50%
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "app.migration-labels" . | nindent 8 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.migration-labels" . | nindent 8 }}
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+        ad.datadoghq.com/{{ .Release.Name }}.check_names: |
+            ["openmetrics"]
+        ad.datadoghq.com/{{ .Release.Name }}.init_configs: |
+            [{}]
+        ad.datadoghq.com/{{ .Release.Name }}.instances: |
+            [
+              {
+                "openmetrics_endpoint": "http://%%host%%:3001/metrics",
+                "namespace": "custom-api",
+                "metrics": ["design_*", "custom_api*", "nodejs*", "process*", "http*"]
+              }
+            ]   
+    spec:
+      volumes:
+      - name: secret-volume
+        secret:
+          secretName: captcha
+      - name: secret-applekey
+        secret:
+          secretName: applekey
+      - name: varver
+        configMap:
+          name: {{ .Release.Name }}-varver
+          items:
+            - key: varver.yaml
+              path: varver.yaml
+      serviceAccountName: custom-s3-client
+      containers:
+      - name: {{ .Release.Name }}
+        image: "000064010000.dkr.ecr.eu-central-1.amazonaws.com/{{ .Values.appName }}:{{ .Values.imageTag | default .Chart.AppVersion }}"
+        imagePullPolicy: Always 
+        command: ["/bin/bash"]
+        args: ["entrypoint.sh"]
+        ports:
+          - name: api-port
+            containerPort: 3000
+            protocol: TCP
+          - name: openmetrics
+            containerPort: 3001
+            protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health/liveness
+            port: openmetrics
+          periodSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /health/liveness
+            port: openmetrics
+          periodSeconds: 5
+          failureThreshold: 45
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: openmetrics
+          periodSeconds: 3
+          failureThreshold: 1
+        env:
+          - name: APP_MIGRATIONS_MODULE_ENABLED
+            value: "true"
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name }}
+        resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        volumeMounts:
+        - name: secret-volume
+          readOnly: true
+          mountPath: "/app/secrets"
+        - name: secret-applekey
+          readOnly: true
+          mountPath: "/app/applekey"
+        - name: varver
+          mountPath: /app/varver.yaml
+          subPath: varver.yaml
+          readOnly: true
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cluster-services
+                    operator: NotIn
+                    values:
+                      - "true"

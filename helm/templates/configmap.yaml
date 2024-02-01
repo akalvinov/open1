@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}"
+  namespace: "{{ .Values.namespace }}"
+data:
+  APP_URL: "{{ .Values.app.url }}"
+  APP_ENV: "{{ .Values.app.env }}"
+  APP_NAME: "custom API"
+  APP_PORT: "443"

@@ -1,0 +1,21 @@
+namespace: "rc"
+
+domainName: rc.custom.com
+
+replicaCount: 2
+
+resources: 
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 252Mi
+
+app:
+  url: "https://ui.rc.custom.com/"
+  env: rc
+  throttling_limit: 5000
+  login_token_expiration_time: "600"
+  jwt_ignore_token_expiration: "false"
+  
